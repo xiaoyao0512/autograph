@@ -1,1 +1,6 @@
 
+Graph Unsupervised Learning: GraphSage.py
+
+Refined Graph Supervised Learning: emb_gnn_twoModels.py, lore_emb_gnn_twoModels.py
+
+Deep Reinforcement Learning: autovec_*.py, lore_autovec_*.py
