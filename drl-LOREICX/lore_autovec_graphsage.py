@@ -228,12 +228,12 @@ if __name__ == "__main__":
             exec4 += speedup_gt_rand
             exec5 += speedup_base_rand
 
-        acc = acc / len(files) * 100.0
-        exec1 = exec1 / len(files)
-        exec2 = exec2 / len(files) * 100
-        exec3 = exec3 / len(files) * 100
-        exec4 = exec4 / len(files) * 100
-        exec5 = exec5 / len(files) * 100
+        acc = acc / len(files_test) * 100.0
+        exec1 = exec1 / len(files_test)
+        exec2 = exec2 / len(files_test) * 100
+        exec3 = exec3 / len(files_test) * 100
+        exec4 = exec4 / len(files_test) * 100
+        exec5 = exec5 / len(files_test) * 100
 
         ID = list(results.results.keys())[0]
         reward_mean_list.append(results.results[ID]['episode_reward_mean'])
