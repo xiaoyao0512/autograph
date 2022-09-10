@@ -74,7 +74,7 @@ class NeuroVectorizerEnv(gym.Env):
         It saves time when the RL agent explores a program it explored before.
         It is also initialized from obs_encodings.pkl file to further save time.''' 
 
-        self.obs_encodings = load_observations_dict(self.new_rundir, 'lore_omp_embeddings2_graphsage_gcn256_icx8.json')
+        self.obs_encodings = load_observations_dict(self.new_rundir, 'lore_omp_embeddings2_graphsage_gcn256_icx8_without_nopragma.json')
 
         if self.compile:
             # stores the runtimes of O3 to compute the RL reward and compared to -O3.
@@ -133,10 +133,10 @@ class NeuroVectorizerEnv(gym.Env):
     def parse_train_data(self):
         #print("******** In parse train data")
         ''' Parse the training data. '''
-        # files_train = json.load(open('lore_training_subset_no_spec2006_omp_all_balanced.json'))
-        files_train = json.load(open('lore_training_subset_nonspec2006_omp_icx8_balanced.json'))
+        files_train = json.load(open('lore_training_subset_icx7_without_no_pragma.json'))
+        # files_train = json.load(open('lore_training_subset_nonspec2006_omp_icx8_balanced.json'))
 
-        with open('lore_omp_embeddings2_graphsage_gcn256_icx8.json') as f:
+        with open('lore_omp_embeddings2_graphsage_gcn256_icx8_without_nopragma.json') as f:
             features = json.load(f)
         feats = features
         files = list(features.keys())

@@ -169,9 +169,9 @@ if __name__ == "__main__":
         exec4 = 0
         exec5 = 0
         cnt = 0
-        VF_list = [0,1,2,3,4,5,6,7] # TODO: change this to match your hardware
+        VF_list = [0,1,2,3,4,5,6] # TODO: change this to match your hardware
         typ = 'max'
-        with open('lore_omp_embeddings2_graphsage_gcn256_icx8.json') as f:
+        with open('lore_omp_embeddings2_graphsage_gcn256_icx8_without_nopragma.json') as f:
             features = json.load(f)
         feats = features
         # labels = features["labels"]
@@ -207,7 +207,7 @@ if __name__ == "__main__":
             if (label == a):
                 acc += 1
             VF_pred = a
-            VF_rand = randint(0, 7)
+            VF_rand = randint(0, 6)
             t1 = times[fn][label]
             t2 = times[fn][VF_pred]
             t3 = baseline[fn]
