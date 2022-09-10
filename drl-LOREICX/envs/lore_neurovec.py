@@ -118,7 +118,7 @@ class NeuroVectorizerEnv(gym.Env):
         ''' Defines the reinforcement leaning environment.
         Modify to match your hardware and programs.
         '''
-        self.vec_action_meaning = [0,1,2,3,4,5,6,7] # TODO: change this to match your hardware
+        self.vec_action_meaning = [0,1,2,3,4,5,6] # TODO: change this to match your hardware
         # self.interleave_action_meaning=[1,2,4,8,16] # TODO: change this to match your hardware
         self.action_space = spaces.Discrete(len(self.vec_action_meaning))
         #the preprocessing generated.
@@ -135,8 +135,9 @@ class NeuroVectorizerEnv(gym.Env):
     def parse_train_data(self):
         #print("******** In parse train data")
         ''' Parse the training data. '''
-        files_train = json.load(open('lore_training_subset_nonspec2006_omp_icx8_balanced.json'))
-        f = open('runtimes_omp_icx_8classes.pickle', 'rb')
+        files_train = json.load(open('lore_training_subset_icx7_without_no_pragma.json'))
+        f = open('runtimes_icx7_omp.pickle', 'rb')
+        # f = open('runtimes_omp_icx_8classes.pickle', 'rb')
         runtimes = pickle.load(f)
         f.close()
         with open('lore_features.json') as f:

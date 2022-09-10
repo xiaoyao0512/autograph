@@ -88,7 +88,8 @@ if __name__ == "__main__":
     base_runtimes = pickle.load(f)
     f.close()
 
-    f = open('runtimes_omp_icx_8classes.pickle', 'rb')
+    # f = open('runtimes_omp_icx_8classes.pickle', 'rb')
+    f = open('runtimes_icx7_omp.pickle', 'rb')
     runtimes = pickle.load(f)
     f.close()
 
@@ -171,7 +172,7 @@ if __name__ == "__main__":
         exec4 = 0
         exec5 = 0
         cnt = 0
-        VF_list = [0,1,2,3,4,5,6,7] # TODO: change this to match your hardware
+        VF_list = [0,1,2,3,4,5,6] # TODO: change this to match your hardware
  # TODO: change this to match your hardware
         dim = 32
         typ = 'max'
