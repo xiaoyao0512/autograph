@@ -396,7 +396,7 @@ def init_runtimes_dict(files,num_loops,VF_len):
     runtimes for all the files and loops for
     different VF/IF during training to save time.'''
 
-    f = open('runtimes_omp_icx_8classes.pickle', 'rb')
+    f = open('runtimes_icx7_omp.pickle', 'rb')
     runtimes = pickle.load(f)
     f.close()
 
