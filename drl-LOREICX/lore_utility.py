@@ -402,7 +402,7 @@ def init_runtimes_dict(files,num_loops,VF_len):
 
     times = {}
     files_VF_IF = runtimes.keys()
-    vf_list = [0,1,2,3,4,5,6,7]
+    vf_list = [0,1,2,3,4,5,6]
 
     for file_VF_IF in files_VF_IF:
         fn_c = file_VF_IF
