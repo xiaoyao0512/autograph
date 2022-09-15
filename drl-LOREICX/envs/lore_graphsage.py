@@ -116,7 +116,7 @@ class NeuroVectorizerEnv(gym.Env):
         ''' Defines the reinforcement leaning environment.
         Modify to match your hardware and programs.
         '''
-        self.vec_action_meaning = [0,1,2,3,4,5,6,7] # TODO: change this to match your hardware
+        self.vec_action_meaning = [0,1,2,3,4,5,6] # TODO: change this to match your hardware
         self.action_space = spaces.Discrete(len(self.vec_action_meaning))
         #The observation space is bounded by the word dictionary 
         #the preprocessing generated.
