@@ -1,7 +1,6 @@
 import dgl
 import numpy as np
 import torch
-import time
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
@@ -16,7 +15,7 @@ from utility import vocal
 from model import SAGE, compute_acc_unsupervised as compute_acc
 from negative_sampler import NegativeSampler
 from sklearn import preprocessing
-from lore_gcc_vocab import full_text_feat
+from lore_vocab import full_text_feat
 
 
 class CrossEntropyLoss(nn.Module):
@@ -105,12 +104,11 @@ def preprocess(vf_if):
     for f in glob.glob("json_lore/**/*.json", recursive = True):
         #fn = f.split('/')[-1].split('.')[0]
         #fn_c = fn + '.c'
-        
-        fn = f.split('/', 1)[-1][:-5]
+        fn = f.split('/', 2)[-1][:-5]
         fn_c = fn
-        if fn not in vf_if.keys():
+        if fn not in vf_if:
             continue
-        print(fn)
+        #print(fn)
         filenames.append(fn)
         with open(f) as fh:
             g = nx.readwrite.json_graph.node_link_graph(json.load(fh))
@@ -124,11 +122,9 @@ def preprocess(vf_if):
             g.filename = fn         
         graphs.append(g)
         #print(fn)
-        time_mean = vf_if[fn]
+        time_mean = vf_if[fn][0]
         labels.append(time_mean)
     labels = scaling(labels, "max")
-    print("The number of graphs is:")
-    print(len(graphs))
     return filenames, graphs, labels
         
 class GraphDataset(Dataset):
@@ -143,7 +139,7 @@ class GraphDataset(Dataset):
 
 
 #f = open('runtimes.pickle', 'rb')
-f = open('runtimes_icx_omp.pickle', 'rb')
+f = open('lore_runtimes.pickle', 'rb')
 runtimes = pickle.load(f)    
 f.close()
 
@@ -154,25 +150,24 @@ files_VF_IF = runtimes.keys()
 vf_list = []
 if_list = []
 for file_VF_IF in files_VF_IF:
-    # tmp = file_VF_IF.rpartition('.')
-    # fn = tmp[0]
-    # tmp = tmp[2].split('-')
-    # VF = int(tmp[0])
-    # IF = int(tmp[1])
-    # vf_list.append(VF)
-    # if_list.append(IF)
-    rt_mean = np.mean(list(runtimes[file_VF_IF]))
-    vf_if[file_VF_IF] = rt_mean
-    # print("filename = ", fn)
-    # print("VF = ", VF)
-    # print("IF = ", IF)
-    # print("mean = ", rt_mean)
-    # if fn not in vf_if.keys():
-    #     vf_if[fn] = (rt_mean, VF, IF)
-    # else:
-    #     rt_mean_pre = vf_if[fn][0]
-    #     if rt_mean < rt_mean_pre:
-    #         vf_if[fn] = (rt_mean, VF, IF)
+    tmp = file_VF_IF.rpartition('.')
+    fn = tmp[0]
+    tmp = tmp[2].split('-')
+    VF = int(tmp[0])
+    IF = int(tmp[1])
+    vf_list.append(VF)
+    if_list.append(IF)
+    rt_mean = np.mean(runtimes[file_VF_IF])
+    #print("filename = ", fn)
+    #print("VF = ", VF)
+    #print("IF = ", IF)
+    #print("mean = ", rt_mean)
+    if fn not in vf_if.keys():
+        vf_if[fn] = (rt_mean, VF, IF)
+    else:
+        rt_mean_pre = vf_if[fn][0]
+        if rt_mean < rt_mean_pre:
+            vf_if[fn] = (rt_mean, VF, IF)
 
 
 dataset = GraphDataset(vf_if)
@@ -202,7 +197,7 @@ print(num_instances, train_size, test_size)
 
 # Create model
 
-kfold = 1
+kfold = 5
 #if (num_instances % kfold != 0):
 #    assert False, "Please select a new kfold value."
 num_per_fold = int(num_instances / kfold)
@@ -210,11 +205,11 @@ batch_size = 1024
 num_epoches = 200
 
 #num_neurons = [8, 16, 32, 64, 128]
-num_neurons = [256]
+num_neurons = [128]
 acc_list = []
 acc_list1 = []
 
-in_feats = 460
+in_feats = 14584
 #num_hidden = 16
 num_layers = 1
 dropout = 0.1
@@ -251,16 +246,16 @@ for num_hidden in num_neurons:
         #    print("param = ", param)
 
         loss_fcn = CrossEntropyLoss()
-        optimizer = optim.Adam(model.parameters(), lr=0.01)
+        optimizer = optim.Adam(model.parameters(), lr=0.001)
 
         #train_data, test_data = torch.utils.data.random_split(dataset, (train_size, test_size))
         #train_loader = torch.utils.data.DataLoader(train_data, batch_size=BATCH_SIZE, shuffle = True, collate_fn=collate)
         #test_loader = torch.utils.data.DataLoader(test_data, batch_size=BATCH_SIZE, shuffle = False, collate_fn=collate)
         #full_loader = torch.utils.data.DataLoader(dataset, shuffle = False, collate_fn=collate)
         epoch_losses = []
-
+        
         for g in graphs:
-            start_time = time.time()
+            
             n_edges = g.num_edges()
             n_nodes = g.num_nodes()
             #print("number of nodes = ", n_nodes)
@@ -311,11 +306,10 @@ for num_hidden in num_neurons:
                 #print("a = ", a)
                 epoch_loss /= (step + 1)
                 print('Epoch {}, loss {:.4f}'.format(epoch, epoch_loss))
-                #epoch_losses.append(epoch_loss)
+                #epoch_losses.append(epoch_loss) 
             #break
-            print("---%s seconds ---" % (time.time() - start_time))
         break
-
+        
     #acc_list.append(acc)
     #acc_list1.append(total_acc1)
 #print("Total accuracy cross validation = ", acc_list)
@@ -329,7 +323,7 @@ for num_hidden in num_neurons:
         print("name = ", name)
         print("param = ", param)
     '''
-    filename = 'lore_graphsage_model_omp_200epochs.sav'
+    filename = 'lore_graphsage_model2.sav'
     pickle.dump(model, open(filename, 'wb'))
     emb = {}
 
@@ -346,9 +340,9 @@ for num_hidden in num_neurons:
         #cnt = cnt + 1
         #if (cnt > 3):
         #    break
-
-    with open('lore_omp_embeddings_'+str(num_hidden)+'_200epochs.json', 'w') as f:
-        json.dump(emb, f)
+        
+    with open('lore_embeddings3_'+str(num_hidden)+'.json', 'w') as f:
+        json.dump(emb, f) 
     
     #torch.save(model, 'gnn_model_'+str(num_hidden)+'.pt')
 '''
