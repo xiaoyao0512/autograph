@@ -12,10 +12,10 @@ def full_text_feat(nodes):
     #with open('vocab.csv') as file:
     with open('lore_vocab.csv') as file:
         lines = file.readlines()
-
+    print("lines = ", len(lines))
     for line in lines:
         out.append(line.rstrip().replace("\"",""))
-    #print(len(out))
+    print(len(out))
     for (node_id, node_dict) in nodes:
         feat = [0] * len(out)
         if 'features' in node_dict: 
@@ -24,17 +24,17 @@ def full_text_feat(nodes):
             words = re.split('(\[\d+ x \[\d+ x i\d+\]\], \[\d+ x \[\d+ x i\d+\]\]\**)|(\[\d+ x \[\d+ x i\d+\]\]\**)|(\[\d+ x [a-z]\d+\]\**)|,| |\(|\)|=|inbounds|label|\.\.\.', text)
             words = list(filter(None, words))
             for word in words:
-                if re.search("^\d+$|\d+\.\d+e", word):
-                    idx = out.index("num")
+                #if re.search("^\d+$|\d+\.\d+e", word):
+                #    idx = out.index("num")
                     #print("1, ", word, idx)
                     #print(word)
-                    feat[idx] = 1
+                #    feat[idx] = 1
                 #elif re.search("^%\d+$", word):
                 #    vocab.append("reg")
-                else:
-                    idx = out.index(word)
+                #else:
+                idx = out.index(word)
                     #print("2, ", word, idx)
-                    feat[out.index(word)] = 1
+                feat[out.index(word)] = 1
         feat_matrix.append(feat)        
 
     return feat_matrix
@@ -55,13 +55,13 @@ for f in glob.glob("json_lore/**/*.json", recursive = True):
             words = re.split('(\[\d+ x \[\d+ x i\d+\]\], \[\d+ x \[\d+ x i\d+\]\]\**)|(\[\d+ x \[\d+ x i\d+\]\]\**)|(\[\d+ x [a-z]\d+\]\**)|,| |\(|\)|=|inbounds|label|\.\.\.', text)
             words = list(filter(None, words))
             for word in words:
-                if re.search("^\d+$|\d+\.\d+e", word):
+                #if re.search("^\d+$|\d+\.\d+e", word):
                     #print(word)
-                    vocab.append("num")
+                #    vocab.append("num")
                 #elif re.search("^%\d+$", word):
                 #    vocab.append("reg")               
-                else:
-                    vocab.append(word)
+                #else:
+                vocab.append(word)
             #print("text = ", text)
             #print("words = ", words)
             
@@ -82,7 +82,7 @@ with open('lore_vocab.csv', 'w', newline='') as f:
     # write multiple rows
     writer.writerows(voc_csv)    
 #print("vocab = ", voc_csv)
-
+'''
 
 #for f in glob.glob("json-small/*.json"):
 #    fn = f.split('/')[-1].split('.')[0]
@@ -90,5 +90,3 @@ with open('lore_vocab.csv', 'w', newline='') as f:
 #    with open(f) as fh:
 #        g = nx.readwrite.json_graph.node_link_graph(json.load(fh))
 #    feat = full_text_feat(g.nodes(data=True))
-'''
-

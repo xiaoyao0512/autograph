@@ -15,7 +15,7 @@ from utility import vocal
 from model import SAGE, compute_acc_unsupervised as compute_acc
 from negative_sampler import NegativeSampler
 from sklearn import preprocessing
-from lore_gcc_vocab import full_text_feat
+from lore_vocab import full_text_feat
 
 
 class CrossEntropyLoss(nn.Module):
@@ -104,7 +104,6 @@ def preprocess(vf_if):
     for f in glob.glob("json_lore/**/*.json", recursive = True):
         #fn = f.split('/')[-1].split('.')[0]
         #fn_c = fn + '.c'
-        
         fn = f.split('/', 2)[-1][:-5]
         fn_c = fn
         if fn not in vf_if:
@@ -210,7 +209,7 @@ num_neurons = [128]
 acc_list = []
 acc_list1 = []
 
-in_feats = 460
+in_feats = 14584
 #num_hidden = 16
 num_layers = 1
 dropout = 0.1

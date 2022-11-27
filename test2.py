@@ -42,6 +42,26 @@ for file_VF_IF in files_VF_IF:
         print("vf_if = ", vf_if[fn])
 '''
 
+def insert_pragma(save_dir, run_dir, fname, VF, IF, insert_timer):
+    file = fname.split('.')[0]
+    new_file = save_dir + '/' + file + ".c"
+    fw = open(new_file, 'w')
+    with open(run_dir+'/'+fname) as fr:
+        for line in fr:
+            #print(line.rstrip())
+            if re.match(r'^\s*for\s*\(',line) or re.match(r'^\s*while\s*\(',line):
+                fw.write("#pragma clang loop vectorize_width("+str(VF)+") interleave_count("+str(IF)+")\n")         
+            if (insert_timer):
+                if (re.match(r'\s+return 0;', line)):
+                    fw.write("gettimeofday(&end, NULL);\n") 
+                    fw.write("double time_taken = end.tv_sec + end.tv_usec / 1e6 - start.tv_sec - start.tv_usec / 1e6;\n")
+                    fw.write("printf(\"time program took %f seconds to execute\\n\", time_taken);\n")
+            fw.write(line)
+            if (insert_timer):
+                if (re.match(r'int\s*main\(', line)): 
+                    fw.write("struct timeval start, end;\ngettimeofday(&start, NULL);\n") 
+    fw.close()
+
 def measure_execution_time(save_dir, run_dir, file_name, VF, IF, repeat):
 
     insert_pragma(save_dir, run_dir, file_name, VF, IF, 1)

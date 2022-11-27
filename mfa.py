@@ -122,16 +122,12 @@ def nspectrum(tau_list, q_list):
     #plt.ylabel('Multi-fractal spectrum, 'r'$f(\alpha)$')
     return al_list, fal_list
 
-def ndimension(tau_list,q_list,size):
+def ndimension(tau_list,q_list):
     dim_list = []
     qd_list = []
     for i in range(len(q_list)):
         if (q_list[i]) != 0:
             dim = tau_list[i]/(q_list[i])
-            if (np.isnan(dim)):
-                dim = size
-            else:
-                dim += size
             dim_list.append(dim)
             qd_list.append(q_list[i])
     #print("dim = ", dim_list)
@@ -141,7 +137,7 @@ def ndimension(tau_list,q_list,size):
     #plt.xlabel('Distorting exponent, 'r'$q$')
     #plt.ylabel('Generalized fractal dimension, 'r'$D(q)$')
     #plt.legend()
-    return qd_list, dim_list
+    return dim_list
 
 import os.path
 
