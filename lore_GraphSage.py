@@ -105,13 +105,14 @@ def preprocess(vf_if):
         #fn = f.split('/')[-1].split('.')[0]
         #fn_c = fn + '.c'
         
-        fn = f.split('/', 2)[-1][:-5].replace(".", "_").replace("-", "_")
+        fn = f.split('/', 2)[-1][:-5]#.replace(".", "_").replace("-", "_")
+        #print(fn)
         fn_c = fn 
         #print(f)
-        if file_dir not in vf_if:
+        if fn not in vf_if:
             continue
         #print(fn)
-        filenames.append(file_dir)
+        filenames.append(fn)
         with open(f) as fh:
             g = nx.readwrite.json_graph.node_link_graph(json.load(fh))
             # calculate the graph features
@@ -121,7 +122,7 @@ def preprocess(vf_if):
             g = dgl.from_networkx(g)
             #feat = min_max_scaler.fit_transform(feat)
             g.ndata["m"] = torch.FloatTensor(feat)
-            g.filename = file_dir            
+            g.filename = fn            
         graphs.append(g)
         #print(fn)
         time_mean = vf_if[fn][0]
@@ -152,9 +153,10 @@ files_VF_IF = runtimes.keys()
 vf_list = []
 if_list = []
 for file_VF_IF in files_VF_IF:
-    tmp = file_VF_IF.split('.')
+    tmp = file_VF_IF.rpartition('.')
     fn = tmp[0]
-    tmp = tmp[1].split('-')
+    #print(fn)
+    tmp = tmp[2].split('-')
     VF = int(tmp[0])
     IF = int(tmp[1])
     vf_list.append(VF)
@@ -204,14 +206,14 @@ kfold = 5
 #    assert False, "Please select a new kfold value."
 num_per_fold = int(num_instances / kfold)
 batch_size = 1024
-num_epoches = 150
+num_epoches = 1
 
 #num_neurons = [8, 16, 32, 64, 128]
 num_neurons = [128]
 acc_list = []
 acc_list1 = []
 
-in_feats = 14239
+in_feats = 14584
 #num_hidden = 16
 num_layers = 1
 dropout = 0.1
@@ -325,7 +327,7 @@ for num_hidden in num_neurons:
         print("name = ", name)
         print("param = ", param)
     '''
-    filename = 'lore_graphsage_model.sav'
+    filename = 'lore_graphsage_model_epoch1.sav'
     pickle.dump(model, open(filename, 'wb'))
     emb = {}
 
@@ -343,7 +345,7 @@ for num_hidden in num_neurons:
         #if (cnt > 3):
         #    break
         
-    with open('lore_embeddings2_'+str(num_hidden)+'.json', 'w') as f:
+    with open('lore_embeddings2_'+str(num_hidden)+'_epoch1.json', 'w') as f:
         json.dump(emb, f) 
     
     #torch.save(model, 'gnn_model_'+str(num_hidden)+'.pt')

@@ -73,7 +73,7 @@ if __name__ == "__main__":
     ray.init()
     args = parser.parse_args()
     #timesteps = [1000, 5000, 10000, 50000, 100000, 200000, 300000, 400000]
-    timesteps = [1000000]
+    timesteps = [8000]
     reward_mean_list = []
     reward_min_list = []
     reward_max_list = []
@@ -87,9 +87,9 @@ if __name__ == "__main__":
         env_config = {'dirpath':'./lore-src-training','new_rundir':'./new_garbage'}
         config = {
                     #"sample_batch_size": 25,
-                    "train_batch_size": 5000,
-                    "sgd_minibatch_size": 1000,
-                    "num_sgd_iter": 1000,
+                    "train_batch_size": 1000,
+                    "sgd_minibatch_size": 200,
+                    "num_sgd_iter": 200,
                     #"lr":5e-5,
                     #"vf_loss_coeff":0.5,
                     "env": "autovec",
@@ -201,23 +201,19 @@ if __name__ == "__main__":
         #with open('features_graphsage_semantics_'+str(dim)+typ+'.json') as f:
         # TODO: features2_gcn_nn_fulltext32.json/features2_gcn_nn_fulltext128.json/features2_graphsage_gcn32.json
         #with open('features2_graphsage_gcn128.json') as f:
-        with open('lore_features.json') as f:
+        with open('lore_features_testing.json') as f:
             features = json.load(f)
         feats = features["feat"]
         labels = features["labels"]
-        files = features["files"]
-        files_root = []
+        files_test = features["files"]
         
-        files_train = list(glob.glob('lore-src-training/**/*.c', recursive=True))
-        files_train = [f.split('/', 1)[-1].rpartition('/')[0] for f in files_train]
-        env.new_testfiles = files_train
+        env.new_testfiles = files_test
 
         rewards = [] 
         acc = 0
-        for fn in files_train:
-            fidx = files.index(fn)
-            assert fidx != -1
-            f = files[fidx]
+        predictions = {}
+        for fidx in range(len(files_test)):
+            f = files_test[fidx]
             label = labels[fidx]
             feat = feats[fidx][0]
             obs = torch.FloatTensor(feat).numpy()
@@ -238,6 +234,7 @@ if __name__ == "__main__":
                 explore=args.explore_during_inference,
                 policy_id="default_policy",  # <- default value
             )
+            predictions[f] = 5 * a[0].item() + a[1].item()
             #print("action = ", a)
             #print("label = ", label)
             y1 = VF_list[int(int(label) / 5)]
@@ -278,12 +275,12 @@ if __name__ == "__main__":
 
 
 
-        acc = acc / len(files) * 100.0
-        exec1 = exec1 / len(files)
-        exec2 = exec2 / len(files) * 100
-        exec3 = exec3 / len(files) * 100
-        exec4 = exec4 / len(files) * 100
-        exec5 = exec5 / len(files) * 100
+        acc = acc / len(files_test) * 100.0
+        exec1 = exec1 / len(files_test)
+        exec2 = exec2 / len(files_test) * 100
+        exec3 = exec3 / len(files_test) * 100
+        exec4 = exec4 / len(files_test) * 100
+        exec5 = exec5 / len(files_test) * 100
 
         ID = list(results.results.keys())[0]
         reward_mean_list.append(results.results[ID]['episode_reward_mean'])
@@ -304,7 +301,9 @@ if __name__ == "__main__":
     print("exec3_list = ", exec3_list)
     print("exec4_list = ", exec4_list)
     print("exec5_list = ", exec5_list)
-
+    
+    with open('lore_neurovec_predictions_800k.json', 'w') as f:
+        json.dump(predictions, f)
 
     #print("results = ", results)
 

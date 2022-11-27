@@ -35,13 +35,8 @@ import re
 import os
 import logging
 import json
-#from extractor_c import CExtractor
-#from config import Config
-#from my_model import Code2VecModel
-#from path_context_reader import EstimatorAction
 
-from utility_neuro import get_bruteforce_runtimes, get_snapshot_from_code, get_runtime, get_vectorized_codes, get_encodings_from_local
-
+from utility_neuro import get_bruteforce_runtimes, get_snapshot_from_code, get_runtime, get_vectorized_codes, get_encodings_from_local, pragma_line
 from lore_utility import init_runtimes_dict, get_O3_runtimes, load_observations_dict
 
 logger = logging.getLogger(__name__)
@@ -49,13 +44,14 @@ logger = logging.getLogger(__name__)
 #NeuroVectorizer RL Environment
 class NeuroVectorizerEnv(gym.Env):
     def __init__(self, env_config):
-        self.dim = 798
+        self.dim = 256
         self.type = 'max'
         self.init_from_env_config(env_config)
-        self.copy_train_data()
+        #self.copy_train_data()
         self.parse_train_data()
         #self.config_AST_parser()
         self.init_RL_env()
+        self.find_true_labels()
         # Keeps track of the file being processed currently.
         self.current_file_idx = 0
         # Keeps track of the current loop being processed currently in that file.
@@ -72,7 +68,11 @@ class NeuroVectorizerEnv(gym.Env):
         It is also initialized from obs_encodings.pkl file to further save time.''' 
         #self.obs_encodings = get_encodings_from_local(self.new_rundir)
         #print("&&&&&&&&& before load_obser_dict")
-        self.obs_encodings = load_observations_dict(self.new_rundir, 'lore_features_training_neurovec.json') 
+        self.obs_encodings = load_observations_dict(self.new_rundir, 'lore_bal_features_training.json')
+
+        #self.obs_encodings = load_observations_dict(self.new_rundir, 'lore_features2_graphsage_gcn128.json') 
+        #print("self.obs_encodings = ", self.obs_encodings)
+    
         #self.obs_encodings = load_observations_dict(self.new_rundir, 'features2_graphsage_gcn128.json')
         #print("obs = ", self.obs_encodings)
         #quit()
@@ -81,7 +81,30 @@ class NeuroVectorizerEnv(gym.Env):
             #print("&&&&&& before get O3 runtimes")
             self.O3_runtimes=get_O3_runtimes(self.new_rundir, self.new_testfiles)
             #print("@@@@@@@@@@@@@after get O3 runtimes")
-    
+
+    def find_true_labels(self):
+        f = open('lore_runtimes.pickle', 'rb')
+        runtimes = pickle.load(f)
+        f.close()
+
+        self.vf_if = {}
+        files_VF_IF = runtimes.keys()
+        for file_VF_IF in files_VF_IF:
+            tmp = file_VF_IF.rpartition('.')
+            fn = tmp[0]
+            tmp = tmp[2].split('-')
+            VF = int(tmp[0])
+            IF = int(tmp[1])
+            fn_c = fn
+            rt_mean = np.median(runtimes[file_VF_IF])
+            if fn_c not in self.vf_if.keys():
+                self.vf_if[fn_c] = (rt_mean, VF, IF)
+            else:
+                rt_mean_pre = self.vf_if[fn_c][0]
+                if rt_mean < rt_mean_pre:
+                    self.vf_if[fn_c] = (rt_mean, VF, IF)
+
+
     def init_from_env_config(self,env_config):
         '''Receives env_config and initalizes all config parameters.'''
         # dirpath is the path to the train data.
@@ -132,29 +155,24 @@ class NeuroVectorizerEnv(gym.Env):
                                  +[spaces.Box(-1,2,shape=(200,),dtype = np.float32)]
                                  )
         '''
-        self.observation_space = spaces.Box(0,3500,shape=((self.dim+2),),dtype = np.float32,)
+        self.observation_space = spaces.Box(-5,5,shape=((self.dim),),dtype = np.float32,)
         #self.observation_space = spaces.Box(-1,1.1,shape=((self.dim+2),),dtype = np.float32,)
     def parse_train_data(self):
         #print("******** In parse train data")
         ''' Parse the training data. '''
-        '''
-        self.orig_train_files = [os.path.join(root, name)
-             for root, dirs, files in os.walk(self.new_rundir)
-             for name in files
-             if name.endswith(".c") and not name.startswith('header.c') 
-             and not name.startswith('aux_AST_embedding_code.c')]
-        '''
-        # copy tesfiles
         emb = {}
-        with open('lore_features_training_neurovec.json') as f:
+        #with open('lore_features.json') as f:
+        #with open('lore_features2_graphsage_gcn128.json') as f:
+        with open('lore_features_training.json') as f:
             emb = json.load(f)
         self.new_testfiles = emb["files"]
         self.num_loops = {}
         for testfile in self.new_testfiles:
+            #print(testfile)
+            #exit()
             self.num_loops[testfile] = 1
-
+    
         self.num = len(self.new_testfiles)
-
 
 
         #print("nre files = ", self.new_testfiles)
@@ -164,18 +182,22 @@ class NeuroVectorizerEnv(gym.Env):
         # to operate only on files that have for loops.
         #self.new_testfiles = list(self.pragmas_idxs.keys())
  
-    #def config_AST_parser(self):
-    #    '''Config the AST tree parser.'''
-    #    self.config = Config(set_defaults=True, load_from_args=False, verify=True)
-    #    self.code2vec = Code2VecModel(self.config)
-    #    self.path_extractor = CExtractor(self.config,clang_path=os.environ['CLANG_PATH'],max_leaves=MAX_LEAF_NODES)
-    #    self.train_input_reader = self.code2vec._create_data_reader(estimator_action=EstimatorAction.Train)
+    def config_AST_parser(self):
+        '''Config the AST tree parser.'''
+        self.config = Config(set_defaults=True, load_from_args=False, verify=True)
+        self.code2vec = Code2VecModel(self.config)
+        self.path_extractor = CExtractor(self.config,clang_path=os.environ['CLANG_PATH'],max_leaves=MAX_LEAF_NODES)
+        self.train_input_reader = self.code2vec._create_data_reader(estimator_action=EstimatorAction.Train)
     
     def get_reward(self,current_filename,VF_idx,IF_idx):
         '''Calculates the RL agent's reward. The reward is the 
         execution time improvement after injecting the pragma
         normalized to -O3.'''
         #print("in get reward, current_filename = ", current_filename)
+        
+        if current_filename not in self.runtimes:
+            current_filename = current_filename.rpartition('_')[0]
+
         if self.compile:
             if self.runtimes[current_filename][self.current_pragma_idx][VF_idx][IF_idx]:
                 runtime = self.runtimes[current_filename][self.current_pragma_idx][VF_idx][IF_idx]
@@ -195,7 +217,17 @@ class NeuroVectorizerEnv(gym.Env):
                 reward = -9
             else:    
                 #print("O3 = ", self.O3_runtimes[current_filename], ", pred = ", runtime)
-                reward = (self.O3_runtimes[current_filename]-runtime)/self.O3_runtimes[current_filename]
+                VF = self.vec_action_meaning[VF_idx]
+                IF = self.interleave_action_meaning[IF_idx]
+                correct = 0
+                if (VF == self.vf_if[current_filename][1] and IF == self.vf_if[current_filename][2]):
+                    correct = 1
+                execT = (self.O3_runtimes[current_filename]-runtime)/self.O3_runtimes[current_filename]
+                sign = 1
+                if execT < 0:
+                    sign = -1
+
+                reward = sign*(abs(execT) ** 1) + 7*correct
             # In inference mode and finished inserting pragmas to this file.
             if self.inference_mode and self.current_pragma_idx+1 == self.num_loops[current_filename]:
                 improvement = self.O3_runtimes[current_filename]/runtime
@@ -230,8 +262,6 @@ class NeuroVectorizerEnv(gym.Env):
     def reset(self):
         ''' RL reset environment function. '''
         #print("@@@@@@@@@@ in reset ")
-        #print("length = ", len(self.new_testfiles))
-        #print(self.current_file_idx)
         current_filename = self.new_testfiles[self.current_file_idx]
         #this make sure that all RL pragmas remain in the code when inferencing.
         #if self.current_pragma_idx == 0 or not self.inference_mode:
@@ -246,6 +276,8 @@ class NeuroVectorizerEnv(gym.Env):
         #for f in self.obs_encodings:
         #    print("########## f = ", f)
         #Check if this encoding already exists (parsed before).
+        #print("current = ", current_filename)
+        #print(current_filename)
         try:
             #print("keys = ", self.obs_encodingd.keys())
             #print("current_filename = ", current_filename)

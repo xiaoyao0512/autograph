@@ -280,11 +280,11 @@ for hidden_size in num_neurons:
                               nn.Linear(hidden_size, output_size2),
                               nn.LogSoftmax(dim=1))
         '''
-        model = nn.Sequential(nn.Linear(input_size, output_size), nn.LogSoftmax(dim=1))
+        model = nn.Sequential(nn.Linear(input_size, output_size))
         #model2 = nn.Sequential(
         #                      nn.Linear(input_size, output_size2))
-        loss_func = nn.NLLLoss()
-        #loss_func = nn.CrossEntropyLoss()
+        #loss_func = nn.NLLLoss()
+        loss_func = nn.CrossEntropyLoss()
         #optimizer = torch.optim.SGD(model.parameters(), lr=0.001)
         optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
         #optimizer = optim.SGD(model.parameters(), lr=0.005, momentum=0.9)
@@ -348,7 +348,7 @@ for hidden_size in num_neurons:
         model.eval()
         #model2.eval()
         # Convert a list of tuples to two lists
-        test_X, test_Y, test_fn = map(list, zip(*test_data))
+        test_X, test_Y, test_fn = map(list, zip(*full_data))
         acc = 0
         exec1 = 0
         exec2 = 0
@@ -357,6 +357,7 @@ for hidden_size in num_neurons:
         pred_list = []
         test_list = []
         bad = []
+        prediction = {}
         for idx in range(len(test_X)):
             x = test_X[idx]
             y = test_Y[idx]
@@ -397,6 +398,7 @@ for hidden_size in num_neurons:
             #print("predicted vf/if = ", pred_label1, pred_label2)
             #print("best vf/if = ", y[0], y[1])
             pred_label = probab.index(max(probab))
+            prediction[fn] = pred_label
             print("label = ", y, (int(pred_label/5), int(pred_label%5)))
             if (pred_label == y):
                 acc += 1
@@ -432,6 +434,9 @@ for hidden_size in num_neurons:
         exec1 = exec1 / len(test_Y)
         exec2 = exec2 / len(test_Y) * 100
         exec3 = exec3 / len(test_Y) * 100
+        with open('lore_code2vec_pred.json', 'w') as f:
+                json.dump(prediction, f)
+
         #acc1 = acc1 / len(test_Y) * 100
         #print("In fold ", kf, ', Accuracy of sampled predictions on the test set: ', acc)
         #print("In fold ", kf, ', Accuracy of sampled predictions on the test set: ', acc1)

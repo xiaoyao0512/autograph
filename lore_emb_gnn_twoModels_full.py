@@ -18,19 +18,66 @@ from random import randint
 from sklearn import preprocessing
 
 # s2_1024_2_2_x_b.c 118 171
-def preprocess(vf_if, emb, loop_count):
+
+def preprocess_train(vf_if, emb):
 #for _ in range(1):
     graphs = []
     labels = []
     #VF = []
     #IF = []
     filenames = []
-    min_max_scaler = preprocessing.MinMaxScaler()
-    for f in glob.glob("json-small/*.json"):
-        fn = f.split('/')[-1].split('.')[0]
-        fn_c = fn + '.c'
+
+    with open("lore_features.json") as f:
+        features = json.load(f)
+    #feats = features["feat"]
+    #labels = features["labels"]
+    files = features["files"]
+    for f in glob.glob("lore/json_lore_training/**/*.json", recursive=True):
+        fn = f.split('/', 2)[-1][:-5]
+        fn_c = fn
         filenames.append(fn_c)
-        #print(fn_c)
+        #print(fn_c)、
+        if fn not in files:
+            continue
+        with open(f) as fh:
+            g = nx.readwrite.json_graph.node_link_graph(json.load(fh))
+            # calculate the graph features
+            g = dgl.from_networkx(g)
+            feat = emb[fn]
+            #feat.extend(loop_count[fn_c])
+            #feat = min_max_scaler.fit_transform(feat)
+            g.ndata["m"] = torch.FloatTensor(feat)
+            g.filename = fn
+        graphs.append(g)
+        #print(fn)
+        labels.append(vf_if[fn][1])
+        #VF.append(vf_if[fn][1])
+        #IF.append(vf_if[fn][2])
+    #print("VF max = ", np.max(VF))
+    #print("IF max = ", np.max(IF))
+    return filenames, graphs, labels
+
+
+def preprocess_test(vf_if, emb):
+#for _ in range(1):
+    graphs = []
+    labels = []
+    #VF = []
+    #IF = []
+    filenames = []
+
+
+    with open("lore_features.json") as f:
+        features = json.load(f)
+    files = features["files"]
+
+    for f in glob.glob("lore/json_lore_spec/**/*.json", recursive=True):
+        fn = f.split('/', 2)[-1][:-5]
+        fn_c = fn
+        filenames.append(fn_c)
+        #print(fn_c)、
+        if fn not in files:
+            continue
         with open(f) as fh:
             g = nx.readwrite.json_graph.node_link_graph(json.load(fh))
             # calculate the graph features
@@ -49,32 +96,40 @@ def preprocess(vf_if, emb, loop_count):
     #print("IF max = ", np.max(IF))
     return filenames, graphs, labels
         
-class GraphDataset(Dataset):
-    def __init__(self, vf_if, emb, loop_count):        
-        self.filenames, self.graphs, self.labels = preprocess(vf_if, emb, loop_count)
+
+
+
+class GraphTrainDataset(Dataset):
+    def __init__(self, vf_if, emb):        
+        self.filenames, self.graphs, self.labels = preprocess_train(vf_if, emb)
     def __len__(self):
         return len(self.graphs)
     def __getitem__(self, idx):
         return self.filenames[idx], self.graphs[idx], self.labels[idx]
        
+class GraphTestDataset(Dataset):
+    def __init__(self, vf_if, emb):
+        self.filenames, self.graphs, self.labels = preprocess_test(vf_if, emb)
+    def __len__(self):
+        return len(self.graphs)
+    def __getitem__(self, idx):
+        return self.filenames[idx], self.graphs[idx], self.labels[idx]
+
+
+
 class GCNClassifier(nn.Module):
-    def __init__(self, in_dim, hidden_dim, n_classes, loop_count, filenames):
+    def __init__(self, in_dim, hidden_dim, n_classes, filenames):
         super(GCNClassifier, self).__init__()
         #self.mode = mode
         self.conv1 = GraphConv(in_dim, hidden_dim)
         #self.conv2 = GraphConv(hidden_dim, hidden_dim) # graph attention network / gated GNN
         #self.conv3 = GraphConv(hidden_dim, hidden_dim) # graph attention network / gated GNN
         #self.conv1 = GatedGraphConv(in_dim, hidden_dim, 5, 1)
-        self.linear1 = nn.Linear(hidden_dim+2, hidden_dim+2)
+        self.linear1 = nn.Linear(hidden_dim, hidden_dim)
         self.relu = nn.ReLU()
-        self.linear2 = nn.Linear(hidden_dim+2, n_classes)
+        self.linear2 = nn.Linear(hidden_dim, n_classes)
         self.log = nn.LogSoftmax(dim=1)
-        min_max_scaler = preprocessing.MinMaxScaler()
-        self.loops = []
         self.filenames = filenames
-        for fn in filenames:
-            self.loops.append(loop_count[fn])
-        self.loops = min_max_scaler.fit_transform(self.loops)
 
 
 
@@ -99,7 +154,7 @@ class GCNClassifier(nn.Module):
         #quit()
         #print("files = ", self.filenames)
         #print("name = ", name)
-        hg = [hg[0].tolist() + self.loops[self.filenames.index(name)].tolist()]
+        hg = hg.tolist()
         #print(hg)
         #quit()
 
@@ -131,12 +186,12 @@ IF_list = [1, 2, 4, 8, 16]
 
 
 
-f = open('runtimes_none_pragma.pickle', 'rb')
+f = open('lore_runtimes_none_pragma2.pickle', 'rb')
 base_runtimes = pickle.load(f)    
 f.close()
 
 
-f = open('runtimes.pickle', 'rb')
+f = open('lore_runtimes2.pickle', 'rb')
 runtimes = pickle.load(f)    
 f.close()
 
@@ -146,25 +201,12 @@ files_VF_IF = runtimes.keys()
 vf_list = []
 if_list = []
 baseline = {}
-num_loops = {
-    "s1": 1, "s2": 1, "s6": 1, "s6n": 1,
-    "s7": 1, "s7n": 1, "s8": 1, "s8n": 1,
-    "s9": 2, "s9n": 2, "s10": 1, "s11": 1,
-    "s12": 1, "s12n": 1, "s12nn": 1, "s13": 1, 
-    "s15": 2
-}
-loop_count = {}
-for file_VF_IF in files_VF_IF:
-    tmp = file_VF_IF.split('.')
-    fn = tmp[0]
-    fn_tmp = fn.split('_')
-    fn_c = fn + '.c'
-    if fn_c not in loop_count.keys():
-        loop_count[fn_c] = [0, 0]
-        for i in range(num_loops[fn_tmp[0]]):
-            loop_count[fn_c][i] = int(fn_tmp[i+1])
 
-    tmp = tmp[1].split('-')
+for file_VF_IF in files_VF_IF:
+    tmp = file_VF_IF.rpartition('.')
+    fn = tmp[0]
+    fn_c = fn
+    tmp = tmp[2].split('-')
     VF = int(tmp[0])
     IF = int(tmp[1])
     label = VF_list.index(VF) * 5 + IF_list.index(IF)
@@ -209,15 +251,16 @@ dims = [128]
 #dim = 8
 for dim in dims:
     emb = {}
-    with open('embeddings2_'+str(dim)+'.json') as f:
+    with open('loregcc_embeddings2_'+str(dim)+'.json') as f:
         emb = json.load(f)
     
-    dataset = GraphDataset(vf_if, emb, loop_count)
-    g_filenames = dataset.filenames
-    num_instances = len(dataset)
-    test_ratio = 0.2
-    test_size = int(num_instances * test_ratio)
-    train_size = num_instances - test_size
+    train_data = GraphTrainDataset(vf_if, emb)
+    test_data = GraphTestDataset(vf_if, emb)
+    g_filenames = train_data.filenames + test_data.filenames
+    num_instances = len(train_data) + len(test_data) 
+    
+    test_size = len(test_data)
+    train_size = len(train_data)
 
 
     print(num_instances, train_size, test_size)
@@ -241,8 +284,6 @@ for dim in dims:
     exec_list3 = []
     exec_list4 = []
     exec_list5 = []
-    run_dir = "training_data_default"
-    save_dir = "training_data_vec"
     files = {}
     for num in num_neurons:
         total_acc = 0
@@ -250,18 +291,20 @@ for dim in dims:
         files[num] = []
         # for kf in range(1):
         for kf in range(kfold):
-            test_set = range(kf*num_per_fold, (kf+1)*num_per_fold)
-            train_set = difference(range(num_instances), test_set)
+            #test_set = range(kf*num_per_fold, (kf+1)*num_per_fold)
+            #train_set = difference(range(num_instances), test_set)
             #print("fold = ", kf)
             #print("test_set = ", test_set)
-            #print("train_set = ", train_set)
+            #print("train_s
 
-            train_data = torch.utils.data.Subset(dataset, train_set)
-            test_data = torch.utils.data.Subset(dataset, test_set)
-            full_data = dataset
+            #train_data = torch.utils.data.Subset(dataset, train_set)
+            #test_data = torch.utils.data.Subset(dataset, test_set)
+            #full_data = dataset
+            full_data = torch.utils.data.ConcatDataset([train_data, test_data])
+
             #if (mode == "multifractal"):
             #    inp = 6
-            model = GCNClassifier(dim, num, 25, loop_count, g_filenames)
+            model = GCNClassifier(dim, num, 25, g_filenames)
             #model2 = GCNClassifier(dim, num, len(IF_list))
             #model = GATClassifier(1, num, 1) 
             #model = GATEDClassifier(1, num, 10)
@@ -333,7 +376,7 @@ for dim in dims:
             model.eval()
             #model2.eval()
             # Convert a list of tuples to two lists
-            full_fn, full_X, full_Y = map(list, zip(*full_data))
+            test_fn, test_X, test_Y = map(list, zip(*full_data))
             acc = 0
             acc1 = 0
             exec1 = 0
@@ -344,11 +387,12 @@ for dim in dims:
             pred_list = []
             test_list = []
             bad = []
-            for idx in range(len(full_X)):
-                x = full_X[idx]
-                y = full_Y[idx]
+            prediction = {}
+            for idx in range(len(test_X)):
+                x = test_X[idx]
+                y = test_Y[idx]
                 test_list.append(int(y))
-                fn = x.filename + '.c'
+                fn = x.filename
                 print("f = ", fn)
                 #print("batch size = ", x)
                 #print("#nodes = ", test_bg.batch_num_nodes())
@@ -356,12 +400,13 @@ for dim in dims:
                 #y = torch.tensor(y).float().view(-1, 1)
                 #print('y00 = ', int(y[0,0]), ', y10 = ', int(y[1,0]))
                 with torch.no_grad():
-                    pred = model(x, full_fn[idx])
+                    pred = model(x, test_fn[idx])
                 #pred2 = model2(x)
                 ps = torch.exp(pred)
                 probab = list(ps.numpy()[0])
                 #print("probab = ", probab)
                 pred_label = probab.index(max(probab))
+                prediction[fn] = pred_label
                 #pred2 = model2(x)
                 #sampled_y1 = VF_list[np.argmax(pred1.tolist())]
                 #sampled_y2 = IF_list[np.argmax(pred2.tolist())]
@@ -406,8 +451,8 @@ for dim in dims:
                 t4 = times[fn][VF_rand][IF_rand]
                 print("t1 = ", t1, ", t2 = ", t2, ", t3 = ", t3, ", t4 = ", t4)
                 exec1 += abs(t1 - t2)
-                speedup_gt = ((t1 - t2) / t1)
-                speedup_base = ((t3 - t2) / t3)
+                speedup_gt = (t1 / t2)
+                speedup_base = (t3 / t2)
                 speedup_gt_rand = ((t1 - t4) / t1)
                 speedup_base_rand = ((t3 - t4) / t3)
                 exec2 += speedup_gt
@@ -416,6 +461,8 @@ for dim in dims:
                 print("speedup compared to baseline O3 = ", speedup_base)
                 exec4 += speedup_gt_rand
                 exec5 += speedup_base_rand
+                if ((abs(speedup_gt) > 2) or (abs(speedup_base) > 2)):
+                    bad.append(fn)
 
             full_fn, full_X, full_Y = map(list, zip(*full_data))
             emb = {}
@@ -426,22 +473,24 @@ for dim in dims:
                 h = g.ndata['m'].float()
                 g = dgl.add_self_loop(g)
                 h = F.relu(model.conv1(g, h))
-                h = F.relu(model.conv1(g, h, torch.tensor([0 for i in range(dgl.DGLGraph.number_of_nodes(g))])))
+                #h = F.relu(model.conv1(g, h, torch.tensor([0 for i in range(dgl.DGLGraph.number_of_nodes(g))])))
                 g.ndata['h'] = h
                 hg = dgl.mean_nodes(g, 'h')
-                hg = [hg[0].tolist() + model.loops[model.filenames.index(aname)].tolist()]  
+                #hg = [hg[0].tolist() + model.loops[model.filenames.index(aname)].tolist()]  
 
                 emb[name] = hg.tolist()
             #with open('embeddings2_graphsage_gcn'+str(dim)+'.json', 'w') as f:
-            with open('embeddings2_graphsage_gcn'+str(num)+'.json', 'w') as f:
+            with open('lore_embeddings2_graphsage_gcn'+str(dim)+'.json', 'w') as f:
                 json.dump(emb, f) 
-            
-            acc = acc / (len(full_Y)) * 100
-            exec1 = exec1 / len(full_Y)
-            exec2 = exec2 / len(full_Y) * 100
-            exec3 = exec3 / len(full_Y) * 100
-            exec4 = exec4 / len(full_Y) * 100
-            exec5 = exec5 / len(full_Y) * 100
+            with open('lore_gcn_pred.json', 'w') as f:
+                json.dump(prediction, f)
+
+            acc = acc / (len(test_Y)) * 100
+            exec1 = exec1 / len(test_Y)
+            exec2 = exec2 / len(test_Y) * 100
+            exec3 = exec3 / len(test_Y) * 100
+            exec4 = exec4 / len(test_Y) * 100
+            exec5 = exec5 / len(test_Y) * 100
             #acc1 = acc1 / len(test_Y) * 100
             #print("In fold ", kf, ', Accuracy of sampled predictions on the test set: ', acc)
             #print("In fold ", kf, ', Accuracy of sampled predictions on the test set: ', acc1)

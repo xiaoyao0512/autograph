@@ -33,17 +33,13 @@ import pickle
 import numpy as np
 import re
 import os
-import logging
+#import logging
+import json
 
-from extractor_c import CExtractor
-from config import Config
-from my_model import Code2VecModel
-from path_context_reader import EstimatorAction
-
-from utility_neuro import get_bruteforce_runtimes, get_snapshot_from_code, get_runtime, get_vectorized_codes, get_encodings_from_local, MAX_LEAF_NODES, pragma_line
+from utility_neuro import get_bruteforce_runtimes, get_snapshot_from_code, get_runtime, get_vectorized_codes, get_encodings_from_local, pragma_line
 from lore_utility import init_runtimes_dict, get_O3_runtimes, load_observations_dict
 
-logger = logging.getLogger(__name__)
+#logger = logging.getLogger(__name__)
 
 #NeuroVectorizer RL Environment
 class NeuroVectorizerEnv(gym.Env):
@@ -51,10 +47,11 @@ class NeuroVectorizerEnv(gym.Env):
         self.dim = 256
         self.type = 'max'
         self.init_from_env_config(env_config)
-        self.copy_train_data()
+        #self.copy_train_data()
         self.parse_train_data()
         #self.config_AST_parser()
         self.init_RL_env()
+        self.find_true_labels()
         # Keeps track of the file being processed currently.
         self.current_file_idx = 0
         # Keeps track of the current loop being processed currently in that file.
@@ -71,7 +68,9 @@ class NeuroVectorizerEnv(gym.Env):
         It is also initialized from obs_encodings.pkl file to further save time.''' 
         #self.obs_encodings = get_encodings_from_local(self.new_rundir)
         #print("&&&&&&&&& before load_obser_dict")
-        self.obs_encodings = load_observations_dict(self.new_rundir, 'lore_features2_graphsage_gcn128.json') 
+        self.obs_encodings = load_observations_dict(self.new_rundir, 'lore_features_training.json')
+
+        #self.obs_encodings = load_observations_dict(self.new_rundir, 'lore_features2_graphsage_gcn128.json') 
         #print("self.obs_encodings = ", self.obs_encodings)
     
         #self.obs_encodings = load_observations_dict(self.new_rundir, 'features2_graphsage_gcn128.json')
@@ -83,6 +82,29 @@ class NeuroVectorizerEnv(gym.Env):
             self.O3_runtimes=get_O3_runtimes(self.new_rundir, self.new_testfiles)
             #print("@@@@@@@@@@@@@after get O3 runtimes")
     
+    def find_true_labels(self):
+        f = open('lore_runtimes.pickle', 'rb')
+        runtimes = pickle.load(f)
+        f.close()
+
+        self.vf_if = {}
+        files_VF_IF = runtimes.keys()
+        for file_VF_IF in files_VF_IF:
+            tmp = file_VF_IF.rpartition('.')
+            fn = tmp[0]
+            tmp = tmp[2].split('-')
+            VF = int(tmp[0])
+            IF = int(tmp[1])
+            fn_c = fn
+            rt_mean = np.median(runtimes[file_VF_IF])
+            if fn_c not in self.vf_if.keys():
+                self.vf_if[fn_c] = (rt_mean, VF, IF)
+            else:
+                rt_mean_pre = self.vf_if[fn_c][0]
+                if rt_mean < rt_mean_pre:
+                    self.vf_if[fn_c] = (rt_mean, VF, IF)
+
+
     def init_from_env_config(self,env_config):
         '''Receives env_config and initalizes all config parameters.'''
         # dirpath is the path to the train data.
@@ -138,29 +160,19 @@ class NeuroVectorizerEnv(gym.Env):
     def parse_train_data(self):
         #print("******** In parse train data")
         ''' Parse the training data. '''
-        self.orig_train_files = [os.path.join(root, name)
-             for root, dirs, files in os.walk(self.new_rundir)
-             for name in files
-             if name.endswith(".c") and not name.startswith('header.c') 
-             and not name.startswith('aux_AST_embedding_code.c')]
-        # copy testfiles
-        self.new_testfiles = list(self.orig_train_files)
-        tmp = []
+        emb = {}
+        #with open('lore_features.json') as f:
+        #with open('lore_features2_graphsage_gcn128.json') as f:
+        with open('lore_features_training.json') as f:
+            emb = json.load(f)
+        self.new_testfiles = emb["files"]
         self.num_loops = {}
         for testfile in self.new_testfiles:
             #print(testfile)
             #exit()
-            name = testfile.split('/', 2)[-1][:-2].rpartition('_')[0].rpartition('/')[0]
-            #print("testfile = ", testfile)
-            #print("name = ", name)
-            #exit() 
-
-            tmp.append(name)
-            self.num_loops[name] = 1
+            self.num_loops[testfile] = 1
     
-        self.new_testfiles = tmp
         self.num = len(self.new_testfiles)
-
 
 
         #print("nre files = ", self.new_testfiles)
@@ -193,15 +205,22 @@ class NeuroVectorizerEnv(gym.Env):
             #print("runtime = ", runtime)
             if self.O3_runtimes[current_filename]==None:
                 reward = 0
-                logger.warning('Program '+current_filename+' does not compile in two seconds.'+
-                               ' Consider removing it or increasing the timeout parameter'+
-                               ' in utility.py.')
+                #logger.warning('Program '+current_filename+' does not compile in two seconds.'+
+              #                 ' Consider removing it or increasing the timeout parameter'+
+              #                 ' in utility.py.')
             elif runtime==None:
                 #penalizing for long compilation time for bad VF/IF
                 reward = -9
             else:    
                 #print("O3 = ", self.O3_runtimes[current_filename], ", pred = ", runtime)
-                reward = (self.O3_runtimes[current_filename]-runtime)/self.O3_runtimes[current_filename]
+                VF = self.vec_action_meaning[VF_idx]
+                IF = self.interleave_action_meaning[IF_idx]
+                correct = 0
+                if (VF == self.vf_if[current_filename][1] and IF == self.vf_if[current_filename][2]):
+                    correct = 1
+                else:
+                    correct = -1
+                reward = (self.O3_runtimes[current_filename]-runtime)/self.O3_runtimes[current_filename] + 0*correct
             # In inference mode and finished inserting pragmas to this file.
             if self.inference_mode and self.current_pragma_idx+1 == self.num_loops[current_filename]:
                 improvement = self.O3_runtimes[current_filename]/runtime
@@ -216,9 +235,9 @@ class NeuroVectorizerEnv(gym.Env):
             VF = self.vec_action_meaning[VF_idx]
             IF = self.interleave_action_meaning[IF_idx]
             opt_runtime_sofar=self.get_opt_runtime(current_filename,self.current_pragma_idx)
-            logger.info(current_filename+' runtime '+str(runtime)+' O3 ' + 
-                        str(self.O3_runtimes[current_filename]) +' reward '+str(reward)+
-                        ' opt '+str(opt_runtime_sofar)+" VF "+str(VF)+" IF "+str(IF))
+            #logger.info(current_filename+' runtime '+str(runtime)+' O3 ' + 
+            #            str(self.O3_runtimes[current_filename]) +' reward '+str(reward)+
+            #            ' opt '+str(opt_runtime_sofar)+" VF "+str(VF)+" IF "+str(IF))
         else:
             # can't calculate the reward without compile/runtime.
             reward = 0
@@ -250,6 +269,8 @@ class NeuroVectorizerEnv(gym.Env):
         #for f in self.obs_encodings:
         #    print("########## f = ", f)
         #Check if this encoding already exists (parsed before).
+        #print("current = ", current_filename)
+        #print(current_filename)
         try:
             #print("keys = ", self.obs_encodingd.keys())
             #print("current_filename = ", current_filename)

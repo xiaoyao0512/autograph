@@ -30,7 +30,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 import ray
 import ray.tune as tune
 from ray.rllib.agents import ppo
-from envs.lore_graphsage import NeuroVectorizerEnv
+from envs.lore_neurovec import NeuroVectorizerEnv
 from ray.tune.registry import register_env
 from ray.tune.logger import TBXLogger
 import argparse
@@ -40,6 +40,7 @@ import numpy as np
 
 from ray.rllib.agents.registry import get_trainer_class
 from random import randint 
+
 
 import glob
 
@@ -73,7 +74,7 @@ if __name__ == "__main__":
     ray.init()
     args = parser.parse_args()
     #timesteps = [1000, 5000, 10000, 50000, 100000, 200000, 300000, 400000]
-    timesteps = [10000]
+    timestep = 800000
     reward_mean_list = []
     reward_min_list = []
     reward_max_list = []
@@ -83,27 +84,34 @@ if __name__ == "__main__":
     exec3_list = []
     exec4_list = []
     exec5_list = []
-    for timestep in timesteps:
+    #checkpoints = ['/root/ray_results/neurovectorizer_train/PPO_autovec_9453d_00000_0_2022-04-30_16-35-43/checkpoint_000100/checkpoint-100', '/root/ray_results/neurovectorizer_train/PPO_autovec_0c328_00000_0_2022-04-30_20-56-46/checkpoint_000100/checkpoint-100', '/root/ray_results/neurovectorizer_train/PPO_autovec_06fa8_00000_0_2022-05-01_01-07-10/checkpoint_000100/checkpoint-100', '/root/ray_results/neurovectorizer_train/PPO_autovec_538d2_00000_0_2022-05-01_05-05-32/checkpoint_000100/checkpoint-100', '/root/ray_results/neurovectorizer_train/PPO_autovec_1221b_00000_0_2022-05-01_09-07-05/checkpoint_000100/checkpoint-100']
+    #checkpoints = ['/root/ray_results/neurovectorizer_train/PPO_autovec_335ec_00000_0_2022-05-10_16-49-47/checkpoint_000100/checkpoint-100', '/root/ray_results/neurovectorizer_train/PPO_autovec_82d3d_00000_0_2022-05-10_22-06-58/checkpoint_000100/checkpoint-100', '/root/ray_results/neurovectorizer_train/PPO_autovec_6e2e9_00000_0_2022-05-11_17-26-02/checkpoint_000100/checkpoint-100', '/root/ray_results/neurovectorizer_train/PPO_autovec_7d239_00000_0_2022-05-11_22-34-15/checkpoint_000100/checkpoint-100', '/root/ray_results/neurovectorizer_train/PPO_autovec_f7872_00000_0_2022-05-12_03-16-51/checkpoint_000100/checkpoint-100']
+
+    #checkpoints = ['/root/ray_results/neurovectorizer_train/PPO_autovec_335ec_00000_0_2022-05-10_16-49-47/checkpoint_000100/checkpoint-100']PPO_autovec_334c3_00000
+    
+    checkpoints = ['/root/ray_results/neurovectorizer_train/PPO_autovec_35474_00000_0_2022-09-26_01-33-22/checkpoint_000800/checkpoint-800']
+    for checkpoint in checkpoints:
         env_config = {'dirpath':'./lore-src-training','new_rundir':'./new_garbage'}
         config = {
                     #"sample_batch_size": 25,
-                    "train_batch_size": 5000,
-                    "sgd_minibatch_size": 1000,
-                    "num_sgd_iter": 1000,
+                    "train_batch_size": 1000,
+                    "sgd_minibatch_size": 200,
+                    "num_sgd_iter": 200,
                     #"lr":5e-5,
                     #"vf_loss_coeff":0.5,
                     "env": "autovec",
                     "horizon":  1,
                     "num_gpus": 1,
                     "model":{'fcnet_hiddens':[256, 256]},
-                    "num_workers": 4,
+                    "num_workers": 2,
                     "env_config":env_config,
                     "framework": args.framework,
                     # Run with tracing enabled for tfe/tf2?
                     "eager_tracing": args.eager_tracing,
                     }
+        '''
         results = tune.run("PPO",
-                #restore = "~/ray_results/PPO_*/checkpoint_240/checkpoint-240",
+                restore = "~/ray_results/PPO_*/checkpoint_240/checkpoint-240",
                 checkpoint_freq  = 10,
                 checkpoint_at_end=True,
                 name = "neurovectorizer_train",
@@ -113,20 +121,26 @@ if __name__ == "__main__":
                 config=config,
                 loggers=[TBXLogger]
         )
-
+        '''
         
         print("Training completed. Restoring new Trainer for action inference.")
         # Get the last checkpoint from the above training run.
-        checkpoint = results.get_last_checkpoint()
+        #checkpoint = results.get_last_checkpoint()
         # Create new Trainer and restore its state from the last checkpoint.
-        trainer = get_trainer_class(args.run)(config=config)
-        trainer.restore(checkpoint)
+        #trainer = get_trainer_class(args.run)#(config=config)
+        #env = NeuroVectorizerEnv(env_config)
+        #env.reset()
+        
+        
+        #config = {"env_config":env_config,"framework":"torch"}
+        trainer = ppo.PPOTrainer(config = config, env="autovec")
+        trainer.restore(checkpoint_path=checkpoint)
 
         # Create the env to do inference in.
         env = NeuroVectorizerEnv(env_config)
         obs = env.reset()
         #print(env.new_testfiles)
-        root = './'+env.new_testfiles[0].split('/')[1]+'/'
+        #root = './'+env.new_testfiles[0].split('/')[1]+'/'
         num_episodes = 0
         episode_reward = 0.0
 
@@ -198,26 +212,25 @@ if __name__ == "__main__":
         IF_list = [1,2,4,8,16] # TODO: change this to match your hardware
         dim = 32
         typ = 'max'
+        benchmark = 'poly'
         #with open('features_graphsage_semantics_'+str(dim)+typ+'.json') as f:
         # TODO: features2_gcn_nn_fulltext32.json/features2_gcn_nn_fulltext128.json/features2_graphsage_gcn32.json
         #with open('features2_graphsage_gcn128.json') as f:
-        with open('lore_features2_graphsage_gcn128.json') as f:
+        with open('lore_features.json') as f:
             features = json.load(f)
         feats = features["feat"]
         labels = features["labels"]
-        files = features["files"]
-        files_root = []
+        files_test = features["files"]
 
-        files_train = list(glob.glob('lore-src-training/**/*.c', recursive=True))
-        files_train = [f.split('/', 1)[-1].rpartition('/')[0] for f in files_train]
-        env.new_testfiles = files_train
-
-        rewards = [] 
         acc = 0
-        for fn in files_train:
-            fidx = files.index(fn)
-            assert fidx != -1
-            f = files[fidx]
+        rewards = []
+        #print("file = ", files)a
+        #print("files_train = ", files_train)
+        #exit()
+        predictions = {}
+        reward = {}
+        for fidx in range(len(files_test)):
+            f = files_test[fidx]
             label = labels[fidx]
             feat = feats[fidx][0]
             obs = torch.FloatTensor(feat).numpy()
@@ -238,11 +251,12 @@ if __name__ == "__main__":
                 explore=args.explore_during_inference,
                 policy_id="default_policy",  # <- default value
             )
+            predictions[f] = 5 * a[0].item() + a[1].item()
             #print("action = ", a)
             #print("label = ", label)
             y1 = VF_list[int(int(label) / 5)]
             y2 = IF_list[int(int(label) % 5)]
-            print("label = ", label, a)
+            #print("label = ", label, a)
             if (y1 == VF_list[a[0]] and y2 == IF_list[a[1]]):
                 acc += 1
             # Send the computed action `a` to the env.
@@ -267,10 +281,12 @@ if __name__ == "__main__":
             exec2 += speedup_gt
             speedup_gt_rand = ((t1 - t4) / t1)
             speedup_base_rand = ((t3 - t4) / t3)
-            print("speedup compared to ground truth = ", speedup_gt)
+            reward[f] = t3.item() / t2.item()
+            print("reward = ", reward[f])
+            #print("speedup compared to ground truth = ", speedup_gt)
             exec3 += speedup_base
-            print("reward = ", speedup_base)
-            print("speedup compared to baseline O3 = ", speedup_base)
+            #print("speedup compared to baseline O3 = ", speedup_base)
+            #print("reward = ", speedup_base)
             #if ((abs(speedup_gt) > 2) or (abs(speedup_base) > 2)):
             #    bad.append(fn)
             exec4 += speedup_gt_rand
@@ -278,34 +294,42 @@ if __name__ == "__main__":
 
 
 
-        acc = acc / len(files) * 100.0
-        exec1 = exec1 / len(files)
-        exec2 = exec2 / len(files) * 100
-        exec3 = exec3 / len(files) * 100
-        exec4 = exec4 / len(files) * 100
-        exec5 = exec5 / len(files) * 100
-
+        acc = acc / len(files_test) * 100.0
+        exec1 = exec1 / len(files_test)
+        exec2 = exec2 / len(files_test) * 100
+        exec3 = exec3 / len(files_test) * 100
+        exec4 = exec4 / len(files_test) * 100
+        exec5 = exec5 / len(files_test) * 100
+        '''
         ID = list(results.results.keys())[0]
         reward_mean_list.append(results.results[ID]['episode_reward_mean'])
         reward_min_list.append(results.results[ID]['episode_reward_min'])
         reward_max_list.append(results.results[ID]['episode_reward_max'])
         accuracy_list.append(acc)
         total_loss_list.append(results.results[ID]['info']['learner']['default_policy']['learner_stats']['total_loss'])
+        '''
+        accuracy_list.append(acc)
         exec2_list.append(exec2)
         exec3_list.append(exec3)
         exec4_list.append(exec4)
         exec5_list.append(exec5)
-    print("reward_mean_list = ", reward_mean_list)
-    print("reward_min_list = ", reward_min_list)
-    print("reward_max_list = ", reward_max_list)
-    print("total_loss_list = ", total_loss_list)
+        print("#files = ", len(files_test))
+
+    #print("reward_mean_list = ", reward_mean_list)
+    #print("reward_min_list = ", reward_min_list)
+    #print("reward_max_list = ", reward_max_list)
+    #print("total_loss_list = ", total_loss_list)
+    #print("#files = ", len(files_test))
     print("accuracy_list = ", accuracy_list)
     print("exec2_list = ", exec2_list)
     print("exec3_list = ", exec3_list)
     print("exec4_list = ", exec4_list)
     print("exec5_list = ", exec5_list)
-
-
+    
+    with open('lore_neurovec_reward.json', 'w') as f:
+        json.dump(reward, f)
+    with open('lore_full_neurovec.json', 'w') as f:
+        json.dump(predictions, f)
     #print("results = ", results)
 
     ray.shutdown()
