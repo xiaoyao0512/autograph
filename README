@@ -4,3 +4,5 @@ Graph Unsupervised Learning: GraphSage.py
 Refined Graph Supervised Learning: emb_gnn_twoModels.py, lore_emb_gnn_twoModels.py
 
 Deep Reinforcement Learning: autovec_{graphsage|neurovec}.py, lore_autovec_{graphsage|neurovec}.py
+
+Train code2vec: put code2vec_feature.py into the code2vec folder in neurovectorizer and the embeddings are saved into lore_features.json
